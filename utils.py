@@ -37,4 +37,35 @@ def get_results_path(save_folder: str) -> str:
     results_path = os.path.join(save_folder, f'results_{final_results_idx}')
     os.makedirs(results_path)
     return results_path
-    
+
+def get_data(dataset_name: str, **kwargs) -> tuple(torch.utils.data.Dataset, dict, callable): 
+    if dataset_name == 'cifar10': 
+        
+        mean = (0.4914, 0.4822, 0.4465)
+        std = (0.2023, 0.1994, 0.2010)
+        resize_size = 32 if kwargs['img_resize_size'] is None else kwargs['img_resize_size']
+
+        transform = torchvision.transforms.Compose([
+            torchvision.transforms.Resize(resize_size),
+            torchvision.transforms.ToTensor(),
+            torchvision.transforms.Normalize(mean=mean, std=std)
+        ])
+
+        dataset = torchvision.datasets.CIFAR10(
+            root=os.path.join('data', 'cifar'), 
+            train=True, 
+            download=True, 
+            transform=transform
+        )
+        metadata = {
+            'data_shape' : (3, resize_size, resize_size),
+            'num_classes' : 10, 
+            'mean' : mean,
+            'std' : std,
+        }
+        collate_fn = None
+
+        return dataset, metadata, collate_fn
+
+    else : 
+        raise NotImplementedError
