@@ -53,7 +53,7 @@ class DDPM(nn.Module):
                 eps_theta = model(x_t, t)  # predict noise at timestep t
                 sigma_sq = self.sigma_sq[timestep]
 
-                x_t = 1 / torch.sqrt(alpha) * (x_t - (1 - alpha) / torch.sqrt(1 - alpha_bar) * eps_theta) + sigma_sq * z
+                x_t = 1 / torch.sqrt(alpha) * (x_t - (1 - alpha) / torch.sqrt(1 - alpha_bar) * eps_theta) + torch.sqrt(sigma_sq) * z
 
         model.train()
 
