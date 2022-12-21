@@ -2,6 +2,8 @@
 .vscode
 .idea
 data
+save
+Docker
 
 # Created by https://www.toptal.com/developers/gitignore/api/macos,linux,python,pycharm,visualstudiocode
 # Edit at https://www.toptal.com/developers/gitignore?templates=macos,linux,python,pycharm,visualstudiocode
