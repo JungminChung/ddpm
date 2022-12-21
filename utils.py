@@ -1,9 +1,36 @@
 import os
+import json
+import random
+import argparse
 import torch
 import torchvision
 import numpy as np
-import random
 from PIL import Image
+from torchinfo import summary
+
+
+def save_model_stats(model: torch.nn.Module, path: str, metadata: dict, device: torch.device,
+                     args: argparse.Namespace) -> None:
+    try:
+        sample_x0 = torch.randn((args.batch_size,) + metadata['data_shape'])
+        sample_t = torch.randint(1, args.noise_step, (args.batch_size,))
+
+        model_stats = summary(model.train(),
+                              input_data=[(sample_x0, sample_t)],
+                              device=device,
+                              verbose=0)
+
+        model_stats = str(model_stats)
+        with open(path, 'w') as f:
+            f.write(model_stats)
+    except:
+        print("Fail to save model stats. Some modules may not support torchinfo.")
+
+
+def save_args_to_json(args: argparse.Namespace, path: str) -> None:
+    args = vars(args)
+    with open(path, 'w') as f:
+        json.dump(args, f, indent=4)
 
 
 def save_grid_image(images: torch.Tensor, path: str, nrow: int = 4, padding: int = 2) -> None:
@@ -35,13 +62,15 @@ def get_results_path(save_folder: str) -> str:
     all_results = os.listdir(save_folder)
 
     if len(all_results) == 0:
-        results_path = os.path.join(save_folder, 'results_0')
-        os.makedirs(results_path)
-        return results_path
+        results_path = os.path.join(save_folder, 'results_00')
+    else:
+        final_results_idx = max([int(result.split('_')[-1]) for result in all_results])
+        results_path = os.path.join(save_folder, f'results_{str(final_results_idx + 1).zfill(2)}')
 
-    final_results_idx = max([int(result.split('_')[-1]) for result in all_results])
-    results_path = os.path.join(save_folder, f'results_{final_results_idx + 1}')
     os.makedirs(results_path)
+    os.makedirs(os.path.join(results_path, 'png'))
+    os.makedirs(os.path.join(results_path, 'ckpt'))
+
     return results_path
 
 
@@ -50,10 +79,10 @@ def get_data(dataset_name: str, **kwargs: dict):  # -> tuple[torch.utils.data.Da
 
         mean = (0.4914, 0.4822, 0.4465)
         std = (0.2023, 0.1994, 0.2010)
-        resize_size = 32 if kwargs['img_resize_size'] is None else kwargs['img_resize_size']
+        resize = 32 if kwargs['resize'] is None else int(kwargs['resize'])
 
         transform = torchvision.transforms.Compose([
-            torchvision.transforms.Resize(resize_size),
+            torchvision.transforms.Resize(resize),
             torchvision.transforms.ToTensor(),
             torchvision.transforms.Normalize(mean=mean, std=std)
         ])
@@ -65,7 +94,7 @@ def get_data(dataset_name: str, **kwargs: dict):  # -> tuple[torch.utils.data.Da
             transform=transform
         )
         metadata = {
-            'data_shape': (3, resize_size, resize_size),
+            'data_shape': (3, resize, resize),
             'num_classes': 10,
             'mean': mean,
             'std': std,

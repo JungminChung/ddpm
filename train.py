@@ -4,10 +4,11 @@ from tqdm import tqdm
 
 import torch
 from torch.utils.data import DataLoader
+from torch.utils.tensorboard import SummaryWriter
 
 from unet import UNet
 from ddpm import DDPM
-from utils import set_seed, get_results_path, get_data, save_grid_image
+from utils import set_seed, get_results_path, get_data, save_grid_image, save_args_to_json, save_model_stats
 
 
 def parse_args():
@@ -17,7 +18,7 @@ def parse_args():
     parser.add_argument('--save_folder', type=str, default='save', help='save folder path for trained results')
 
     parser.add_argument('--dataset', type=str, default='cifar10', choices=['cifar10'], help='train dataset name')
-    parser.add_argument('--img_resize_size', default=None,
+    parser.add_argument('--resize', type=int, default=None,
                         help='if given resize image size when target dataset is kind of img dataset, else no resize')
 
     parser.add_argument('--batch_size', type=int, default=100, help='batch size for training')
@@ -34,12 +35,17 @@ def main():
 
     set_seed(args.seed)
     results_path = get_results_path(args.save_folder)
+    print('#' * 10, f'results path: {results_path}', '#' * 10)
+    save_args_to_json(args, os.path.join(results_path, 'args.json'))
+    writer = SummaryWriter(results_path)
 
     dataset, metadata, collate_fn = get_data(args.dataset, **vars(args))
     dataloader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True, collate_fn=collate_fn)
 
     model = UNet(T=1000, ch=128, ch_mult=[1, 2, 2, 2], attn=[1], num_res_blocks=2, dropout=0.1)
     model = model.to(device)
+
+    save_model_stats(model, os.path.join(results_path, 'model_stats.txt'), metadata, device, args)
 
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
     criterion = torch.nn.MSELoss()
@@ -60,10 +66,12 @@ def main():
             optimizer.step()
 
             progress.set_description(f'Epoch: {epoch}, Loss: {loss.item():.4f}')
+        
+        writer.add_scalar('loss', loss.item(), epoch)
 
         sampled_data = diffusion.sampling(model, 16)
-        save_grid_image(sampled_data, os.path.join(results_path, f'{epoch}.png'))
-        torch.save(model.state_dict(), os.path.join(results_path, f'{epoch}.pth'))
+        save_grid_image(sampled_data, os.path.join(results_path, 'png', f'{epoch}.png'))
+        torch.save(model.state_dict(), os.path.join(results_path, 'ckpt', f'{epoch}.ckpt'))
 
 
 if __name__ == '__main__':
